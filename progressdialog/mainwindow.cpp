@@ -2,11 +2,11 @@
 #include "ui_mainwindow.h"
 
 #include <QProgressDialog>
+#include <QtConcurrent/QtConcurrent>
+#include <QFuture>
+#include <QFutureWatcher>
 #include <QThread>
 #include <QDebug>
-
-#include <future>
-#include <iostream>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -28,7 +28,7 @@ void MainWindow::longProcess()
 	{
 		QThread::msleep(50);
 		// uncomment to test exception
-		// if (i == 40) throw std::logic_error("Uh oh");
+		if (i == 40) throw std::logic_error("Uh oh");
 	}
 }
 
@@ -42,24 +42,23 @@ void MainWindow::foo()
 	// disable close button
 	progress.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint | Qt::WindowTitleHint);
 
-	// start asynchronous task
-	auto f = std::async([&progress, this]()
+
+	QFutureWatcher<void> watcher;
+	connect(&watcher, SIGNAL(finished()), &progress, SLOT(accept()));
+	QFuture<std::exception_ptr> f = QtConcurrent::run([this]()
 	{
+		std::exception_ptr e;
 		try
 		{
 			longProcess();
-			qDebug() << "Long event finished";
-			progress.done(0);
-			qDebug() << "Progress bar done";
 		}
 		catch (...)
 		{
-			progress.done(1);
-			qDebug() << "Progress bar done because of error";
-			// rethrow after progress bar closed
-			throw;
+			e = std::current_exception();
 		}
+		return e;
 	});
+	watcher.setFuture(f);
 
 	// show progress bar (blocking)
 	progress.exec();
@@ -67,7 +66,11 @@ void MainWindow::foo()
 	try
 	{
 		// handle exceptions if any
-		f.get();
+		auto e = f.result();
+		if (e)
+		{
+			std::rethrow_exception(e);
+		}
 	}
 	catch (const std::exception& e)
 	{

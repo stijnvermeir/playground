@@ -1,23 +1,55 @@
 #include "test.h"
 
-#include "mkm/mkm.h"
+#include <mkm/mkm.h>
+#include <mkm/parser.h>
 
 #include <QDebug>
 
 test::test(QObject *parent)
 	: QObject(parent)
+	, client_("https://sandbox.mkmapi.eu/ws/v1.1/output.json/", "CyWyAy36kiBIc2Xq", "UH4GA6J9QDHhQEIDQobwk6dQZk0PWjGm", "RpgaOf12KmK3reEcF0Y4AA6Zy0ZYOjQn", "IyTaypcimQITo7FoWvaqSUmZDC9nE7FF")
+	, counter_(0)
 {
+	connect(&client_.networkAccessManager(), SIGNAL(finished(QNetworkReply*)), this, SLOT(finished(QNetworkReply*)));
 }
 
 test::~test()
 {
-
 }
 
 void test::run()
 {
-	mkm::Mkm mkmClient{"CyWyAy36kiBIc2Xq", "UH4GA6J9QDHhQEIDQobwk6dQZk0PWjGm", "RpgaOf12KmK3reEcF0Y4AA6Zy0ZYOjQn", "IyTaypcimQITo7FoWvaqSUmZDC9nE7FF"};
-	auto result = mkmClient.findProduct("Selesnyaevangel", 1, 1, true);
+	// sync
+	// process(client_.findProduct("BlackCat", 1, 1, true));
+
+	// async
+	QNetworkReply* reply = client_.findProductAsync("BlackCat");
+	reply->setProperty("dataRowIndex", 147852);
+
+	reply = client_.findProductAsync("nivmizzetdracogenius");
+	reply->setProperty("dataRowIndex", 987654);
+
+	reply = client_.findProductAsync("anger");
+	reply->setProperty("dataRowIndex", 888888);
+
+	counter_ = 3;
+}
+
+void test::finished(QNetworkReply* reply)
+{
+	qDebug() << "ASYNC";
+	qDebug() << "property dataRowIndex:" << reply->property("dataRowIndex").toInt();
+	process(mkm::parseProducts(reply->readAll()));
+	reply->deleteLater();
+	--counter_;
+	if (counter_ <= 0)
+	{
+		emit finished();
+	}
+}
+
+void test::process(const QVector<mkm::Product>& result)
+{
 	for (const mkm::Product& product : result)
 	{
 		qDebug() << "idProduct:" << product.idProduct;
@@ -32,7 +64,4 @@ void test::run()
 
 		qDebug() << "";
 	}
-
-	emit finished();
 }
-

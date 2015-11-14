@@ -18,14 +18,8 @@ signals:
 public slots:
 	void run();
 
-private slots:
-	void finished(QNetworkReply* reply);
-
 private:
-	void process(const QVector<mkm::Product>& result);
-
 	mkm::Mkm client_;
-	int counter_;
 };
 
 #endif // TEST_H
